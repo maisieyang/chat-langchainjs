@@ -48,6 +48,7 @@ async function loadLangChainDocs(): Promise<Array<DocumentInterface>> {
   return loader.load();
 }
 
+// 默认使用 OpenAI 的嵌入模型。将其更改为你选择的向量存储很简单。只需将 OpenAIEmbeddings 类换成你选择的模型即可！
 function getEmbeddingsModel(): Embeddings {
   return new OpenAIEmbeddings();
 }
@@ -98,6 +99,7 @@ async function ingestDocs() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // todo: 
   const weaviateClient = (weaviate as any).client({
     scheme: "https",
     host: process.env.WEAVIATE_URL,
@@ -105,6 +107,7 @@ async function ingestDocs() {
   }) as WeaviateClient;
 
   const embeddings = getEmbeddingsModel();
+  // todo·
   const vectorStore = new WeaviateStore(embeddings, {
     client: weaviateClient,
     indexName: process.env.WEAVIATE_INDEX_NAME,
