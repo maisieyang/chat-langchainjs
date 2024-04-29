@@ -3,6 +3,7 @@ import weaviate, { ApiKey, WeaviateClient } from "weaviate-ts-client";
 import { DocumentInterface } from "@langchain/core/documents";
 import { RecursiveUrlLoader } from "langchain/document_loaders/web/recursive_url";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+//import { MistralAIEmbeddings } from "@langchain/mistralai";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { Embeddings } from "@langchain/core/embeddings";
 import { WeaviateStore } from "@langchain/weaviate";
@@ -51,6 +52,7 @@ async function loadLangChainDocs(): Promise<Array<DocumentInterface>> {
 // 默认使用 OpenAI 的嵌入模型。将其更改为你选择的向量存储很简单。只需将 OpenAIEmbeddings 类换成你选择的模型即可！
 function getEmbeddingsModel(): Embeddings {
   return new OpenAIEmbeddings();
+ // return new MistralAIEmbeddings();
 }
 
 async function ingestDocs() {
