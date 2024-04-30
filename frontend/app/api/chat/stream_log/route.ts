@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import type { Document } from "@langchain/core/documents";
-import 'dotenv/config';
 
 import {
   Runnable,
