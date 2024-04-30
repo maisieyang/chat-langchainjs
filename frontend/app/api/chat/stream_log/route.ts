@@ -1,8 +1,9 @@
 // 基于 Next.js 的服务器环境设计的，主要功能是处理用户的 POST 请求，并利用 LangChain 框架和相关的 AI 模型生成响应。
+
 import { NextRequest, NextResponse } from "next/server";
 
 import type { Document } from "@langchain/core/documents";
-import 'dotenv/config';
+
 
 import {
   Runnable,
@@ -13,8 +14,8 @@ import {
 } from "@langchain/core/runnables";
 import { HumanMessage, AIMessage, BaseMessage } from "@langchain/core/messages";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
-import { ChatFireworks } from "@langchain/community/chat_models/fireworks";
+// import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
+// import { ChatFireworks } from "@langchain/community/chat_models/fireworks";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import {
   PromptTemplate,
@@ -22,8 +23,14 @@ import {
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 
-import weaviate, { ApiKey } from "weaviate-ts-client";
-import { WeaviateStore } from "@langchain/weaviate";
+// import weaviate, { ApiKey } from "weaviate-ts-client";
+// import { WeaviateStore } from "@langchain/weaviate";
+
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+import { OllamaEmbeddings } from "@langchain/community/embeddings/ollama";
+
+import { ChatOllama } from "@langchain/community/chat_models/ollama";
+
 
 export const runtime = "edge";
 
@@ -74,31 +81,46 @@ type RetrievalChainInput = {
 接着，它使用这个客户端和其他参数创建一个WeaviateStore实例。这个实例是从现有的索引创建的。
 最后，它将WeaviateStore实例转换为检索器，并返回这个检索器。
 */
-const getRetriever = async () => {
-  if (
-    !process.env.WEAVIATE_INDEX_NAME ||
-    !process.env.WEAVIATE_API_KEY ||
-    !process.env.WEAVIATE_URL
-  ) {
-    throw new Error(
-      "WEAVIATE_INDEX_NAME, WEAVIATE_API_KEY and WEAVIATE_URL environment variables must be set",
-    );
-  }
+// const getRetriever = async () => {
+//   if (
+//     !process.env.WEAVIATE_INDEX_NAME ||
+//     !process.env.WEAVIATE_API_KEY ||
+//     !process.env.WEAVIATE_URL
+//   ) {
+//     throw new Error(
+//       "WEAVIATE_INDEX_NAME, WEAVIATE_API_KEY and WEAVIATE_URL environment variables must be set",
+//     );
+//   }
 
-  const client = weaviate.client({
-    scheme: "https",
-    host: process.env.WEAVIATE_URL,
-    apiKey: new ApiKey(process.env.WEAVIATE_API_KEY),
+//   const client = weaviate.client({
+//     scheme: "https",
+//     host: process.env.WEAVIATE_URL,
+//     apiKey: new ApiKey(process.env.WEAVIATE_API_KEY),
+//   });
+//   const vectorstore = await WeaviateStore.fromExistingIndex(
+//     new OpenAIEmbeddings({}),
+//     {
+//       client,
+//       indexName: process.env.WEAVIATE_INDEX_NAME,
+//       textKey: "text",
+//       metadataKeys: ["source", "title"],
+//     },
+//   );
+//   return vectorstore.asRetriever({ k: 6 });
+// };
+
+const getRetriever = async () => {
+  const embeddings = new OllamaEmbeddings({
+    model: "nomic-embed-text",
   });
-  const vectorstore = await WeaviateStore.fromExistingIndex(
-    new OpenAIEmbeddings({}),
+
+  const vectorstore = await Chroma.fromExistingCollection(
+    embeddings,
     {
-      client,
-      indexName: process.env.WEAVIATE_INDEX_NAME,
-      textKey: "text",
-      metadataKeys: ["source", "title"],
+      collectionName: process.env.COLLECTION_NAME
     },
   );
+
   return vectorstore.asRetriever({ k: 6 });
 };
 
@@ -239,23 +261,27 @@ export async function POST(req: NextRequest) {
     const config = body.config;
 
     // 创建一个ChatOpenAI或ChatFireworks实例，并将其存储在llm变量中
-    let llm;
-    if (config.configurable.llm === "openai_gpt_3_5_turbo") {
-      llm = new ChatOpenAI({
-        modelName: "gpt-3.5-turbo-1106",
-        temperature: 0,
-      });
-    } else if (config.configurable.llm === "fireworks_mixtral") {
-      llm = new ChatFireworks({
-        modelName: "accounts/fireworks/models/mixtral-8x7b-instruct",
-        temperature: 0,
-      });
-    } else {
-      throw new Error(
-        "Invalid LLM option passed. Must be 'openai' or 'mixtral'. Received: " +
-          config.llm,
-      );
-    }
+    // let llm;
+    // if (config.configurable.llm === "openai_gpt_3_5_turbo") {
+    //   llm = new ChatOpenAI({
+    //     modelName: "gpt-3.5-turbo-1106",
+    //     temperature: 0,
+    //   });
+    // } else if (config.configurable.llm === "fireworks_mixtral") {
+    //   llm = new ChatFireworks({
+    //     modelName: "accounts/fireworks/models/mixtral-8x7b-instruct",
+    //     temperature: 0,
+    //   });
+    // } else {
+    //   throw new Error(
+    //     "Invalid LLM option passed. Must be 'openai' or 'mixtral'. Received: " +
+    //       config.llm,
+    //   );
+    // }
+
+    const llm = new ChatOllama({
+      model: "mistral"
+    });
     // 获取一个检索器 
     const retriever = await getRetriever();
     // 并使用llm和检索器创建一个答案链

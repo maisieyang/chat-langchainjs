@@ -1,12 +1,14 @@
 /* eslint-disable no-process-env */
-import weaviate, { ApiKey, WeaviateClient } from "weaviate-ts-client";
+// import weaviate, { ApiKey, WeaviateClient } from "weaviate-ts-client";
 import { DocumentInterface } from "@langchain/core/documents";
 import { RecursiveUrlLoader } from "langchain/document_loaders/web/recursive_url";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 //import { MistralAIEmbeddings } from "@langchain/mistralai";
-import { OpenAIEmbeddings } from "@langchain/openai";
+// import { OpenAIEmbeddings } from "@langchain/openai";
+import { OllamaEmbeddings } from "@langchain/community/embeddings/ollama";
 import { Embeddings } from "@langchain/core/embeddings";
-import { WeaviateStore } from "@langchain/weaviate";
+// import { WeaviateStore } from "@langchain/weaviate";
+import { Chroma } from "@langchain/community/vectorstores/chroma";
 import { PostgresRecordManager } from "@langchain/community/indexes/postgres";
 import { SitemapLoader } from "langchain/document_loaders/web/sitemap";
 import { index } from "./_index.js";
@@ -51,20 +53,25 @@ async function loadLangChainDocs(): Promise<Array<DocumentInterface>> {
 
 // 默认使用 OpenAI 的嵌入模型。将其更改为你选择的向量存储很简单。只需将 OpenAIEmbeddings 类换成你选择的模型即可！
 function getEmbeddingsModel(): Embeddings {
-  return new OpenAIEmbeddings();
+  // return new OpenAIEmbeddings();
  // return new MistralAIEmbeddings();
+ return new OllamaEmbeddings({
+  model: "nomic-embed-text",
+});
 }
 
 async function ingestDocs() {
-  if (
-    !process.env.WEAVIATE_API_KEY ||
-    !process.env.WEAVIATE_URL ||
-    !process.env.WEAVIATE_INDEX_NAME
-  ) {
-    throw new Error(
-      "WEAVIATE_API_KEY, WEAVIATE_URL, and WEAVIATE_INDEX_NAME must be set in the environment"
-    );
-  }
+  // if (
+  //   !process.env.DATABASE_HOST ||
+  //   !process.env.DATABASE_PORT ||
+  //   !process.env.DATABASE_USERNAME ||
+  //   !process.env.DATABASE_PASSWORD ||
+  //   !process.env.DATABASE_NAME
+  // ) {
+  //   throw new Error(
+  //     "WEAVIATE_API_KEY, WEAVIATE_URL, and WEAVIATE_INDEX_NAME must be set in the environment"
+  //   );
+  // }
 
   const smithDocs = await loadLangSmithDocs();
   console.debug(`Loaded ${smithDocs.length} docs from LangSmith`);
@@ -102,19 +109,24 @@ async function ingestDocs() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // todo: 
-  const weaviateClient = (weaviate as any).client({
-    scheme: "https",
-    host: process.env.WEAVIATE_URL,
-    apiKey: new ApiKey(process.env.WEAVIATE_API_KEY),
-  }) as WeaviateClient;
+  // const weaviateClient = (weaviate as any).client({
+  //   scheme: "https",
+  //   host: process.env.WEAVIATE_URL,
+  //   apiKey: new ApiKey(process.env.WEAVIATE_API_KEY),
+  // }) as WeaviateClient;
 
   const embeddings = getEmbeddingsModel();
   // todo·
-  const vectorStore = new WeaviateStore(embeddings, {
-    client: weaviateClient,
-    indexName: process.env.WEAVIATE_INDEX_NAME,
-    textKey: "text",
-  });
+  // const vectorStore = new WeaviateStore(embeddings, {
+  //   client: weaviateClient,
+  //   indexName: process.env.WEAVIATE_INDEX_NAME,
+  //   textKey: "text",
+  // });
+
+
+const vectorStore = new Chroma(embeddings, {
+  collectionName: process.env.COLLECTION_NAME
+});
 
   const connectionOptions = process.env.RECORD_MANAGER_DB_URL
     ? {
@@ -128,8 +140,15 @@ async function ingestDocs() {
         database: process.env.DATABASE_NAME,
       };
 
+  // const recordManager = new PostgresRecordManager(
+  //   `weaviate/${process.env.WEAVIATE_INDEX_NAME}`,
+  //   {
+  //     postgresConnectionOptions: connectionOptions,
+  //   }
+  // );
+
   const recordManager = new PostgresRecordManager(
-    `weaviate/${process.env.WEAVIATE_INDEX_NAME}`,
+    `local/${process.env.COLLECTION_NAME}`,
     {
       postgresConnectionOptions: connectionOptions,
     }
@@ -152,18 +171,18 @@ async function ingestDocs() {
     "Indexing stats"
   );
 
-  try {
-    const { data: numVecsData } = await weaviateClient.graphql
-      .aggregate()
-      .withClassName(process.env.WEAVIATE_INDEX_NAME)
-      .withFields("meta { count }")
-      .do();
-    const numVecs =
-      numVecsData.Aggregate[process.env.WEAVIATE_INDEX_NAME][0].meta.count;
-    console.log(`LangChain now has this many vectors: ${numVecs}`);
-  } catch (e) {
-    console.error("Failed to fetch total vectors.");
-  }
+  // try {
+  //   const { data: numVecsData } = await weaviateClient.graphql
+  //     .aggregate()
+  //     .withClassName(process.env.WEAVIATE_INDEX_NAME)
+  //     .withFields("meta { count }")
+  //     .do();
+  //   const numVecs =
+  //     numVecsData.Aggregate[process.env.WEAVIATE_INDEX_NAME][0].meta.count;
+  //   console.log(`LangChain now has this many vectors: ${numVecs}`);
+  // } catch (e) {
+  //   console.error("Failed to fetch total vectors.");
+  // }
 }
 
 ingestDocs().catch((e) => {
